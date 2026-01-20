@@ -1,0 +1,21 @@
+﻿
+  <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+    <PropertyGroup>
+      <OutputType>WinExe</OutputType>
+      <TargetFramework>net8.0-windows</TargetFramework>
+      <UseWPF>true</UseWPF>
+      <UseWindowsForms>true</UseWindowsForms>
+      <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    </PropertyGroup>
+    <ItemGroup>
+      <None Remove="app.png" />
+    </ItemGroup>
+    <ItemGroup>
+      <Content Include="Assets\AppIcon.ico" />
+    </ItemGroup>
+    <ItemGroup>
+      <Resource Include="app.png" />
+    </ItemGroup>
+  </Project>
+
+

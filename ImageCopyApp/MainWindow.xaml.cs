@@ -1,6 +1,4 @@
-﻿using Microsoft.Win32;
-
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
@@ -8,9 +6,7 @@ using System.Media;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
-using System.Media;
-
+using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
 
 namespace ImageCopyApp
@@ -18,6 +14,8 @@ namespace ImageCopyApp
     public partial class MainWindow : Window
     {
         private AppSettings _settings = new();
+        private CancellationTokenSource? _cts;
+
 
         private static readonly string[] ImageExtensions = new[]
         {
@@ -30,6 +28,7 @@ namespace ImageCopyApp
             _settings = AppSettings.Load();
             ApplySettingsToUI();
             UpdateFolderCounts();
+            btnCancelCopy.IsEnabled = false;
         }
 
         private int CountImages(string? folder)
@@ -117,7 +116,7 @@ namespace ImageCopyApp
             }
         }
 
-        private async void Copy_Click(object sender, RoutedEventArgs e)
+        private async void StartCopy_Click(object sender, RoutedEventArgs e)
         {
             txtLog.Clear();
             //txtStatus.Text = "";
@@ -141,22 +140,31 @@ namespace ImageCopyApp
             }
             Directory.CreateDirectory(_settings.DestinationFolder);
 
-            //btnCopy.IsEnabled = false;
+            btnCopy.IsEnabled = false;
+            btnCancelCopy.IsEnabled = true;
             //progress.Value = 0;
 
             try
             {
-                await Task.Run(() => CopyMatchingImages());
+                // await Task.Run(() => CopyMatchingImages());
+                _cts = new CancellationTokenSource();
+                await Task.Run(() => CopyMatchingImages(_cts.Token));
             }
             finally
             {
                 btnCopy.IsEnabled = true;
+                btnCancelCopy.IsEnabled = false;
             }
         }
 
-        private void CopyMatchingImages()
+        private void CancelCopy_Click(object sender, RoutedEventArgs e)
         {
-            var startTime = DateTime.Now;
+            _cts?.Cancel();
+            AppendStatus("Copy operation cancelled by user.");
+        }
+
+        private void CopyMatchingImages(CancellationToken token)
+        {
             var lowResFiles = Directory.EnumerateFiles(_settings.LowResFolder!, "*.*", SearchOption.AllDirectories)
                                        .Where(f => ImageExtensions.Contains(Path.GetExtension(f).ToLower()))
                                        .ToList();
@@ -165,7 +173,6 @@ namespace ImageCopyApp
                                       .Where(f => ImageExtensions.Contains(Path.GetExtension(f).ToLower()))
                                       .ToList();
 
-            // Build lookup for hi-res files
             var hiLookup = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var hr in hiResFiles)
             {
@@ -175,13 +182,19 @@ namespace ImageCopyApp
                 hiLookup[key] = hr;
             }
 
-            int copied = 0, missing = 0, skipped = 0, errors = 0,i=0 ;
             int total = lowResFiles.Count;
+            int copied = 0, missing = 0, skipped = 0, errors = 0;
+            var startTime = DateTime.Now;
 
-
-            // Parallel copy
-            Parallel.ForEach(lowResFiles, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, lf =>
+            for (int i = 0; i < total; i++)
             {
+                if (token.IsCancellationRequested)
+                {
+                    AppendStatus("Copy cancelled.");
+                    break;
+                }
+
+                var lf = lowResFiles[i];
                 var lowKey = _settings.MatchByNameOnly
                     ? Path.GetFileNameWithoutExtension(lf)
                     : Path.GetFileName(lf);
@@ -199,37 +212,42 @@ namespace ImageCopyApp
 
                         if (File.Exists(destPath) && !_settings.Overwrite)
                         {
-                            Interlocked.Increment(ref skipped);
-                            AppendLog($"Skipped (exists): {destRelative}");
+                            skipped++;
+                            Dispatcher.Invoke(() => AppendLog($"Skipped (exists): {destRelative}"));
                         }
                         else
                         {
                             File.Copy(hiPath, destPath, overwrite: _settings.Overwrite);
-                            Interlocked.Increment(ref copied);
-                            AppendLog($"Copied: {destRelative}");
+                            copied++;
+                            Dispatcher.Invoke(() => AppendLog($"Copied: {destRelative}"));
                         }
                     }
                     catch (Exception ex)
                     {
-                        Interlocked.Increment(ref errors);
-                        AppendLog($"Error copying {destRelative}: {ex.Message}");
-                        PlayErrorSound();
+                        errors++;
+                        Dispatcher.Invoke(() =>
+                        {
+                            AppendLog($"Error copying {destRelative}: {ex.Message}");
+                            PlayErrorSound();
+                        });
                     }
                 }
                 else
                 {
-                    Interlocked.Increment(ref missing);
-                    AppendLog($"No match for: {Path.GetFileName(lf)}");
+                    missing++;
+                    Dispatcher.Invoke(() => AppendLog($"No match for: {Path.GetFileName(lf)}"));
                 }
 
-                // Update progress safely
-                int done = copied + missing + skipped + errors;
-                UpdateProgress(done, total, copied, missing, skipped, errors, startTime);
-                
-            });
+                Dispatcher.Invoke(() => UpdateProgress(i + 1, total, copied, missing, skipped, errors, startTime));
+            }
 
-            AppendStatus($"Done. Copied: {copied}, Missing: {missing}, Skipped: {skipped}, Errors: {errors}");
-            PlaySuccessSound();
+            Dispatcher.Invoke(() =>
+            {
+                AppendStatus($"Done. Copied: {copied}, Missing: {missing}, Skipped: {skipped}, Errors: {errors}");
+                PlaySuccessSound();
+             
+            });
+            
             Dispatcher.Invoke(UpdateFolderCounts);
         }
 
@@ -291,16 +309,17 @@ namespace ImageCopyApp
             base.OnClosed(e);
         }
 
-  
+        private void PlaySuccessSound()
+        {
+            SystemSounds.Exclamation.Play();   // or SystemSounds.Exclamation, Beep, Hand
+        }
 
-private void PlaySuccessSound()
-    {
-        SystemSounds.Exclamation.Play();   // or SystemSounds.Exclamation, Beep, Hand
-    }
+        private void PlayErrorSound()
+        {
+            SystemSounds.Hand.Play();       // "error" style sound
+        }
 
-    private void PlayErrorSound()
-    {
-        SystemSounds.Hand.Play();       // "error" style sound
+       
+
     }
-}
 }

@@ -82,16 +82,19 @@ Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Button x:Name="btnCopy" Content="Copy" Width="120" Click="Copy_Click" Grid.Row="0" Grid.Column="0"/>
+                <!--<Button x:Name="btnCopy" Content="Copy" Width="120" Click="Copy_Click" Grid.Row="0" Grid.Column="0"/>-->
+                <Button x:Name="btnCopy" Content="Start Copy" Grid.Row="0" Grid.Column="0" Width="100" Click="StartCopy_Click"/>
+                <Button x:Name="btnCancelCopy" Content="Cancel" Grid.Row="0" Grid.Column="1" Width="100" Margin="8,0,0,0" Click="CancelCopy_Click"/>
 
-                <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="2" Margin="12,0" VerticalAlignment="Center">
                     <TextBlock x:Name="lblEta"
                                Text="ETA: --"
                                Foreground="Gray"
                                FontStyle="Italic"
                                Margin="0,0,12,0"/>
                     <TextBlock x:Name="txtStatus" VerticalAlignment="Center"/>
-                </StackPanel>
+                </StackPanel>            
+
 
                 <!-- Progress bar moved to its own row below the action row, spanning all columns -->
                 <ProgressBar x:Name="progressBar"

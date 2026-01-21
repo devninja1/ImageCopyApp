@@ -4,9 +4,12 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Media;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
+using System.Media;
 
 using WinForms = System.Windows.Forms;
 
@@ -117,7 +120,7 @@ namespace ImageCopyApp
         private async void Copy_Click(object sender, RoutedEventArgs e)
         {
             txtLog.Clear();
-            txtStatus.Text = "";
+            //txtStatus.Text = "";
             CaptureUIToSettings();
 
             // Validate
@@ -138,8 +141,8 @@ namespace ImageCopyApp
             }
             Directory.CreateDirectory(_settings.DestinationFolder);
 
-            btnCopy.IsEnabled = false;
-            progress.Value = 0;
+            //btnCopy.IsEnabled = false;
+            //progress.Value = 0;
 
             try
             {
@@ -153,6 +156,7 @@ namespace ImageCopyApp
 
         private void CopyMatchingImages()
         {
+            var startTime = DateTime.Now;
             var lowResFiles = Directory.EnumerateFiles(_settings.LowResFolder!, "*.*", SearchOption.AllDirectories)
                                        .Where(f => ImageExtensions.Contains(Path.GetExtension(f).ToLower()))
                                        .ToList();
@@ -171,25 +175,22 @@ namespace ImageCopyApp
                 hiLookup[key] = hr;
             }
 
+            int copied = 0, missing = 0, skipped = 0, errors = 0,i=0 ;
             int total = lowResFiles.Count;
-            int copied = 0, missing = 0, skipped = 0, errors = 0;
 
-            for (int i = 0; i < total; i++)
+
+            // Parallel copy
+            Parallel.ForEach(lowResFiles, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, lf =>
             {
-                var lf = lowResFiles[i];
                 var lowKey = _settings.MatchByNameOnly
                     ? Path.GetFileNameWithoutExtension(lf)
                     : Path.GetFileName(lf);
 
                 if (hiLookup.TryGetValue(lowKey, out var hiPath))
                 {
-                    // Compute relative path of the low-res file
                     var relativePath = Path.GetRelativePath(_settings.LowResFolder!, lf);
-
-                    // Replace filename with hi-res filename (preserve extension)
                     var destRelative = Path.Combine(Path.GetDirectoryName(relativePath) ?? "",
                                                     Path.GetFileName(hiPath));
-
                     var destPath = Path.Combine(_settings.DestinationFolder!, destRelative);
 
                     try
@@ -198,34 +199,37 @@ namespace ImageCopyApp
 
                         if (File.Exists(destPath) && !_settings.Overwrite)
                         {
-                            skipped++;
+                            Interlocked.Increment(ref skipped);
                             AppendLog($"Skipped (exists): {destRelative}");
                         }
                         else
                         {
                             File.Copy(hiPath, destPath, overwrite: _settings.Overwrite);
-                            copied++;
+                            Interlocked.Increment(ref copied);
                             AppendLog($"Copied: {destRelative}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        errors++;
+                        Interlocked.Increment(ref errors);
                         AppendLog($"Error copying {destRelative}: {ex.Message}");
+                        PlayErrorSound();
                     }
                 }
                 else
                 {
-                    missing++;
+                    Interlocked.Increment(ref missing);
                     AppendLog($"No match for: {Path.GetFileName(lf)}");
                 }
 
-                UpdateProgress((i + 1), total, copied, missing, skipped, errors);
-            }
+                // Update progress safely
+                int done = copied + missing + skipped + errors;
+                UpdateProgress(done, total, copied, missing, skipped, errors, startTime);
+                
+            });
 
             AppendStatus($"Done. Copied: {copied}, Missing: {missing}, Skipped: {skipped}, Errors: {errors}");
-
-            // Update counts after copy
+            PlaySuccessSound();
             Dispatcher.Invoke(UpdateFolderCounts);
         }
 
@@ -238,14 +242,42 @@ namespace ImageCopyApp
             });
         }
 
-        private void UpdateProgress(int current, int total, int copied, int missing, int skipped, int errors)
+        //private void UpdateProgress(int current, int total, int copied, int missing, int skipped, int errors)
+        //{
+        //    Dispatcher.Invoke(() =>
+        //    {
+        //        progress.Maximum = total;
+        //        progress.Value = current;
+        //        txtStatus.Text = $"Processed {current}/{total} | Copied {copied} • Missing {missing} • Skipped {skipped} • Errors {errors}";
+        //    });
+        //}
+
+        private void UpdateProgress(int done, int total, int copied, int missing, int skipped, int errors, DateTime startTime)
         {
-            Dispatcher.Invoke(() =>
+            // If called from non-UI thread, re-dispatch asynchronously to avoid blocking worker threads
+            if (!Dispatcher.CheckAccess())
             {
-                progress.Maximum = total;
-                progress.Value = current;
-                txtStatus.Text = $"Processed {current}/{total} | Copied {copied} • Missing {missing} • Skipped {skipped} • Errors {errors}";
-            });
+                Dispatcher.BeginInvoke(new Action(() =>
+                    UpdateProgress(done, total, copied, missing, skipped, errors, startTime)));
+                return;
+            }
+
+            // UI-thread-safe code
+            double percent = total > 0 ? (double)done / total * 100 : 0;
+            progressBar.Value = percent;
+
+            var elapsed = DateTime.Now - startTime;
+            if (done > 0)
+            {
+                double avgPerItem = elapsed.TotalSeconds / done;
+                double remainingSeconds = avgPerItem * (total - done);
+                var eta = TimeSpan.FromSeconds(remainingSeconds);
+                lblEta.Text = $"ETA: {eta:mm\\:ss} remaining";
+            }
+            else
+            {
+                lblEta.Text = "ETA: --";
+            }
         }
 
         private void AppendStatus(string message)
@@ -258,5 +290,17 @@ namespace ImageCopyApp
             CaptureUIToSettings();
             base.OnClosed(e);
         }
+
+  
+
+private void PlaySuccessSound()
+    {
+        SystemSounds.Exclamation.Play();   // or SystemSounds.Exclamation, Beep, Hand
     }
+
+    private void PlayErrorSound()
+    {
+        SystemSounds.Hand.Play();       // "error" style sound
+    }
+}
 }

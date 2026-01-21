@@ -19,8 +19,13 @@
             <TextBox x:Name="txtLowRes" Width="360" Margin="8,0" IsReadOnly="True"/>
             <Button Content="Browse..." Width="90" Click="BrowseLowRes_Click"/>
             <!-- Badge -->
-            <Border Background="Green" CornerRadius="12" Width="24" Height="24" Margin="8,0,0,0">
-                <TextBlock x:Name="lblLowResCount" Text="0" 
+            <Border Background="Green" CornerRadius="12"
+        Padding="6,2"
+        Margin="8,0,0,0"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center">
+
+                <TextBlock x:Name="lblLowResCount" Text="0" FontWeight="Bold"
                    Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
         </StackPanel>
@@ -31,8 +36,12 @@
             <TextBox x:Name="txtHiRes" Width="360" Margin="8,0" IsReadOnly="True"/>
             <Button Content="Browse..." Width="90" Click="BrowseHiRes_Click"/>
             <!-- Badge -->
-            <Border Background="Green" CornerRadius="12" Width="24" Height="24" Margin="8,0,0,0">
-                <TextBlock x:Name="lblHiResCount" Text="0" 
+            <Border Background="Green" CornerRadius="12"
+        Padding="6,2"
+        Margin="8,0,0,0"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center">
+                <TextBlock x:Name="lblHiResCount" Text="0" FontWeight="Bold"
         Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
         </StackPanel>
@@ -43,8 +52,12 @@
             <TextBox x:Name="txtDest" Width="360" Margin="8,0" IsReadOnly="True"/>
             <Button Content="Browse..." Width="90" Click="BrowseDest_Click"/>
             <!-- Badge -->
-            <Border Background="Green" CornerRadius="12" Width="24" Height="24" Margin="8,0,0,0">
-                <TextBlock x:Name="lblDestCount" Text="0" 
+            <Border Background="Green" CornerRadius="12"
+        Padding="6,2"
+        Margin="8,0,0,0"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center">
+                <TextBlock x:Name="lblDestCount" Text="0"  FontWeight="Bold"
 Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
         </StackPanel>
@@ -57,27 +70,59 @@ Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
         <!-- Actions + Progress -->
         <DockPanel Grid.Row="5">
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                <Button x:Name="btnCopy" Content="Copy" Width="120" Click="Copy_Click"/>
-                <ProgressBar x:Name="progress" Width="300" Height="18" Margin="16,0,0,0"/>
-                <TextBlock x:Name="txtStatus" Margin="12,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
+            <!-- Grid with two rows: top row for actions/status, second row for the progress bar -->
+            <Grid DockPanel.Dock="Top" Margin="0,8,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="btnCopy" Content="Copy" Width="120" Click="Copy_Click" Grid.Row="0" Grid.Column="0"/>
+
+                <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="lblEta"
+                               Text="ETA: --"
+                               Foreground="Gray"
+                               FontStyle="Italic"
+                               Margin="0,0,12,0"/>
+                    <TextBlock x:Name="txtStatus" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Progress bar moved to its own row below the action row, spanning all columns -->
+                <ProgressBar x:Name="progressBar"
+                             Grid.Row="1"
+                             Grid.Column="0"
+                             Grid.ColumnSpan="3"
+                             Height="20"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"
+                             Foreground="Green"
+                             HorizontalAlignment="Stretch"
+                             VerticalAlignment="Center"
+                             Margin="0,8,0,4"/>
+            </Grid>
 
             <TextBox x:Name="txtLog"
-         Foreground="#FF4CD60F"
-         FontFamily="Consolas"
-         FontSize="13"
-         TextWrapping="Wrap"
-         VerticalScrollBarVisibility="Auto"
-         AcceptsReturn="True"
-         IsReadOnly="True"
-         Margin="0,8,0,0"
-         Height="200">
+                     Foreground="#FF4CD60F"
+                     FontFamily="Consolas"
+                     FontSize="13"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     AcceptsReturn="True"
+                     IsReadOnly="True"
+                     Margin="0,8,0,0"
+                     Height="200">
                 <TextBox.Background>
                     <!-- fade effect -->
                     <ImageBrush Opacity="0.2" Stretch="Uniform" ImageSource="/app.png"/>
                 </TextBox.Background>
             </TextBox>
         </DockPanel>
-    </Grid>    
+    </Grid>
 </Window>
